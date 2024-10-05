@@ -1,38 +1,41 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request, Get, HttpException, HttpStatus, Patch, Param, Delete, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { TaskService } from './task.service';
+import { CreateTaskDto } from './Dtos/create.task.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Task } from './task.entity';
+import { AuthGuard } from '@nestjs/passport';
+import { UpdateTaskDto } from './Dtos/update.task.dto';
 
-@Controller('task')
+@Controller('tasks')
 export class TaskController {
-    constructor(private readonly taskService : TaskService){}
+    constructor(private taskService: TaskService) {}
 
-    @Get()
-    getAllTasks(){
-        return this.taskService.findAll()
-    }
-
-    @Get(':id')
-    getTaskById(@Param('id') id:number){
-        return this.taskService.findOne(id)
-    }
-
+    @UseGuards(AuthGuard('jwt')) 
     @Post()
-    createTask(@Body() task: Task){
-        return this.taskService.create(task)
+    async createTask(@Body() createTaskDto: CreateTaskDto, @Request() req) {
+        const userId = req.user.id;
+        return this.taskService.createTask(userId, createTaskDto);
     }
 
-    @Put(':id')
-    updateTask(@Param('id') id: number, @Body() updatedTask: Task) {
-      return this.taskService.update(id, updatedTask);
+    @UseGuards(JwtAuthGuard)
+    @Get('/mytasks')
+    async getAllTasks(@Request() req): Promise<Task[]> {
+        const userId = req.user.userId;
+        console.log('Fetching tasks for userId:', userId);
+        return this.taskService.findAllTasks(userId);
     }
 
     @Patch(':id')
-    patchTask(@Param('id') id: number, @Body() partialTask: Partial<Task>) {
-      return this.taskService.partialUpdate(id, partialTask);
+    @UseGuards(JwtAuthGuard)
+    async updateTask(@Param('id') id: string, @Body() updateTaskDto: UpdateTaskDto) {
+        const taskId = parseInt(id, 10); 
+        return await this.taskService.updateTask(taskId, updateTaskDto);
     }
 
     @Delete(':id')
-    deleteTask(@Param('id') id: number) {
-      return this.taskService.delete(id);
+    @UseGuards(JwtAuthGuard)
+    async deleteTask(@Param('id') id: string) {
+        const taskId = parseInt(id, 10); 
+        return await this.taskService.deleteTask(taskId); 
     }
 }
