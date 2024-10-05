@@ -1,40 +1,49 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Task } from './task.entity';
 import { Repository } from 'typeorm';
+import { Task } from './task.entity';
+import { CreateTaskDto } from './Dtos/create.task.dto'; 
+import { UpdateTaskDto } from './Dtos/update.task.dto';
 
 @Injectable()
 export class TaskService {
     constructor(
         @InjectRepository(Task)
         private taskRepository: Repository<Task>,
-    ){}
+    ) {}
 
-    findAll(): Promise<Task[]>{
-        return this.taskRepository.find()
-    }
-
-    findOne(id:number): Promise<Task>{
-        return this.taskRepository.findOneBy({id})
-    }
-
-    create(task: Task): Promise<Task>{
-        return this.taskRepository.save(task)
+    async createTask(userId: number, createTaskDto: CreateTaskDto): Promise<Task> {
+        const task = this.taskRepository.create({
+            ...createTaskDto, 
+            userId: userId  
+        });
+        return this.taskRepository.save(task);
     }
 
-    async update(id: number, updatedTask: Task): Promise<Task> {
-        await this.taskRepository.update(id, updatedTask);
-        return this.findOne(id);
+    async findAllTasks(userId: number): Promise<Task[]> {
+        console.log('Fetching tasks for userId:', userId);
+        return this.taskRepository.find({ where: { userId } });
+      }
+
+      async updateTask(id: number, updateTaskDto: UpdateTaskDto):Promise<Task[]> {
+        const task = await this.taskRepository.findOne({ where: { id } });
+        
+        if (!task) {
+            throw new NotFoundException(`Task with ID ${id} not found`);
+        }
+        task.title = updateTaskDto.title;
+        task.description = updateTaskDto.description;
+
+        await this.taskRepository.save(task);
+        return [task];
     }
 
-    async partialUpdate(id: number, partialTask: Partial<Task>): Promise<Task> {
-        await this.taskRepository.update(id, partialTask);
-        return this.findOne(id);
+    async deleteTask(id: number): Promise<Task> {
+        const task = await this.taskRepository.findOne({ where: { id } });
+        if (!task) {
+            throw new NotFoundException(`Task with ID ${id} not found`);
+        }
+        await this.taskRepository.remove(task);
+        return task;
     }
-    
-    async delete(id: number): Promise<void> {
-        await this.taskRepository.delete(id);
-        return undefined;
-    }
-    
 }
